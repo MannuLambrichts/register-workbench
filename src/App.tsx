@@ -1,6 +1,6 @@
 import './App.css'
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // --- Utilities ---
 /*
@@ -497,6 +497,44 @@ type MemEntry = { id: number; label: string; value: bigint; created: number };
 type Test = { expr: string; expectDec: string };
 
 export default function RegisterWorkbench() {
+	const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+		if (typeof window === 'undefined') return 'dark';
+
+		const stored = window.localStorage.getItem('registerWorkbenchTheme');
+		if (stored === 'light' || stored === 'dark') return stored;
+
+		if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+			return 'dark';
+		}
+
+		return 'light';
+	});
+
+	// Keep theme in sync with system preference (only influences first explicit choice)
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const mq = window.matchMedia('(prefers-color-scheme: dark)');
+
+		// If there is no stored preference yet, update theme when system preference changes
+		const stored = window.localStorage.getItem('registerWorkbenchTheme');
+		if (stored !== 'light' && stored !== 'dark') {
+			const handler = (e: MediaQueryListEvent) => {
+				setTheme(e.matches ? 'dark' : 'light');
+			};
+			mq.addEventListener('change', handler);
+			return () => mq.removeEventListener('change', handler);
+		}
+	}, []);
+
+	// Persist theme in localStorage whenever it changes
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		window.localStorage.setItem('registerWorkbenchTheme', theme);
+	}, [theme]);
+
+
+
 	const [width, setWidth] = useState<number>(32);
 	const [maskExprToWidth, setMaskExprToWidth] = useState<boolean>(false);
 	const [signedView, setSignedView] = useState<boolean>(false);
@@ -726,480 +764,871 @@ export default function RegisterWorkbench() {
 	}
 
 	return (
-		<div className="min-h-screen w-full bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 p-6">
-			<div className="mx-auto max-w-6xl grid md:grid-cols-5 gap-6">
-				<header className="md:col-span-5">
-					<h1 className="text-2xl font-semibold tracking-tight">Microcontroller Register Workbench</h1>
-					<p className="text-sm opacity-80">Convert hex/decimal/binary, compute expressions with memory, toggle bits, view endianness and floats, work with ASCII, and generate C-style masks.</p>
-				</header>
+		<div className={theme === 'dark' ? 'dark' : ''}>
+			<div className="min-h-screen w-full bg-slate-100 text-slate-900 dark:bg-bg dark:text-slate-100">
+				{theme === 'dark' ? <div className="app-bg" /> : <div className="app-bg-light" />}
+				<div className="app-grid" />
 
-				{/* Value + Settings + Calculators + ASCII */}
-				<section className="md:col-span-3 space-y-3">
-					{/* Main value */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow">
-						<div className="font-medium">Registers</div>
-						<label className="text-xs opacity-70 font-medium">Value (hex/dec/bin accepted)</label>
-						<div className="mt-2 flex gap-2">
-							<input
-								className="flex-1 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 font-mono"
-								value={input}
-								onChange={e => setInput(e.target.value)}
-								placeholder="0x1F, 31, 0b11111, 1Fh, 11111b"
-							/>
-						</div>
-						<div className="mt-3 grid grid-cols-3 gap-2">
-							<div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3">
-								<div className="text-xs opacity-70">Unsigned</div>
-								<div className="font-mono break-all">{parsed.ok ? uval.toString() : '—'}</div>
+				<div className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10 relative">
+					<header className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+						<div>
+							<div className="inline-flex items-center gap-2 rounded-full border border-slate-300/80 bg-white/80 px-3 py-1 text-xs text-slate-700 shadow-soft backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+								<span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+								<span className="font-mono uppercase tracking-[0.15em] text-[10px]">
+									Microcontroller Toolkit
+								</span>
 							</div>
-							<div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3">
-								<div className="text-xs opacity-70">Hex</div>
-								<div className="font-mono">{parsed.ok ? '0x' + uval.toString(16) : '—'}</div>
-							</div>
-							<div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3">
-								<div className="text-xs opacity-70">Binary</div>
-								<div className="font-mono text-xs break-words">{parsed.ok ? chunkString(binStr, 4).join('_') : '—'}</div>
-							</div>
-						</div>
-						<div className="mt-3 flex flex-wrap items-center gap-3">
-							<div className="flex items-center gap-2">
-								<span className="text-sm">Width</span>
-								<select className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1"
-									value={width}
-									onChange={e => setWidth(parseInt(e.target.value, 10))}>
-									{[8, 16, 24, 32, 48, 64].map(w => <option key={w} value={w}>{w}</option>)}
-								</select>
-							</div>
-							<label className="inline-flex items-center gap-2 cursor-pointer">
-								<input type="checkbox" checked={signedView} onChange={e => setSignedView(e.target.checked)} />
-								<span className="text-sm">Show signed</span>
-							</label>
-							{signedView && (
-								<div className="text-sm font-mono px-2 py-1 rounded bg-neutral-100 dark:bg-neutral-800">{sval.toString()}</div>
-							)}
-						</div>
-					</div>
-
-					{/* Expression Calculators */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow space-y-3">
-						<div className="flex items-center gap-3 flex-wrap">
-							<div className="font-medium">Expression Calculators</div>
-							<label className="inline-flex items-center gap-2 cursor-pointer ml-auto text-sm">
-								<input type="checkbox" checked={maskExprToWidth} onChange={e => setMaskExprToWidth(e.target.checked)} />
-								Limit to {width}-bit
-							</label>
-							<button
-								className="rounded-xl px-3 py-1 text-sm bg-neutral-200 dark:bg-neutral-800 hover:opacity-90"
-								onClick={addCalc}
-							>+ Add calculator</button>
+							<h1 className="mt-4 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+								Microcontroller Register Workbench
+							</h1>
+							<p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+								Convert hex/decimal/binary, compute expressions with memory, inspect bitfields and
+								IEEE-754 floats, and generate C-style masks.
+							</p>
 						</div>
 
-						<div className="space-y-3">
-							{calcs.map((c, idx) => {
-								const res = evalExpression(c.expr, width, maskExprToWidth);
-								let floatView32: string | null = null;
-								let floatView64: string | null = null;
-								if (res.ok) {
-									if (res.float) {
-										floatView32 = formatFloat(bitsToFloat32(float32ToBits(res.float) & maskForWidth(32)));
-										floatView64 = formatFloat(bitsToFloat64(float64ToBits(res.float) & maskForWidth(64)));
-									} else {
-										floatView32 = formatFloat(bitsToFloat32(res.value));
-										floatView64 = formatFloat(bitsToFloat64(res.value));
-									}
-								}
+						<button
+							onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
+							className="self-start inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-xs hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-slate-600"
+						>
+							<span className="text-lg">{theme === 'dark' ? '☀️' : '🌙'}</span>
+							<span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+						</button>
+					</header>
 
-								return (
-									<div key={c.id} className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-2 bg-neutral-50/60 dark:bg-neutral-900/60">
-										<div className="flex items-center gap-2">
-											<div className="text-xs uppercase tracking-wide opacity-70">Calc {idx + 1}</div>
-											{calcs.length > 1 && (
-												<button
-													className="ml-auto text-xs px-2 py-0.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:opacity-90"
-													onClick={() => removeCalc(c.id)}
-												>Remove</button>
-											)}
+					<div className="grid gap-6 md:grid-cols-5">
+						{/* Left column: main value + calculators + ASCII + floats */}
+						<section className="md:col-span-3 space-y-4">
+							{/* Main value */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="flex items-center justify-between gap-2">
+									<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+										Main Value
+									</div>
+								</div>
+								<label className="mt-3 block text-xs font-medium text-slate-700 dark:text-slate-300">
+									Value (hex / dec / bin)
+								</label>
+								<div className="mt-2 flex gap-2">
+									<input
+										className="flex-1 rounded-xl border border-slate-300 bg-white/90 px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:border-brand-500/70 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+										value={input}
+										onChange={e => setInput(e.target.value)}
+										placeholder="0x1F, 31, 0b11111, 1Fh, 11111b"
+									/>
+								</div>
+								<div className="mt-3 grid grid-cols-3 gap-2">
+									<div className="rounded-xl border border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-900/80">
+										<div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+											Unsigned
 										</div>
-										<input
-											className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 font-mono text-sm"
-											value={c.expr}
-											onChange={e => setCalcs(prev => prev.map(cc => cc.id === c.id ? { ...cc, expr: e.target.value } : cc))}
-											placeholder="Examples: 0x45 & 0b100001 + 9, (1<<23) | 5, ~0x3 & 0xFF"
-										/>
-										{res.ok ? (
-											<>
-												<div className="grid grid-cols-3 gap-2">
-													<div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-2">
-														<div className="text-[11px] opacity-70">Decimal</div>
-														<div className="font-mono text-xs break-all">{res.value.toString()}</div>
-													</div>
-													<div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-2">
-														<div className="text-[11px] opacity-70">Hex</div>
-														<div className="font-mono text-xs">{'0x' + res.value.toString(16)}</div>
-													</div>
-													<div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-2">
-														<div className="text-[11px] opacity-70">Binary</div>
-														<div className="font-mono text-[10px] break-words">{chunkString(res.value.toString(2).padStart(width, '0'), 4).join('_')}</div>
-													</div>
-												</div>
-												<div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-neutral-700 dark:text-neutral-300">
-													<div className="rounded-lg border border-neutral-200 dark:border-neutral-800 px-2 py-1">
-														<div className="opacity-70">As f32</div>
-														<div className="font-mono overflow-hidden text-ellipsis">{floatView32}</div>
-													</div>
-													<div className="rounded-lg border border-neutral-200 dark:border-neutral-800 px-2 py-1">
-														<div className="opacity-70">As f64</div>
-														<div className="font-mono overflow-hidden text-ellipsis">{floatView64}</div>
-													</div>
-												</div>
-											</>
-										) : (
-											<div className="text-xs text-red-600 dark:text-red-400">{res.error}</div>
-										)}
-										<div className="flex flex-wrap gap-2 mt-1">
-											<button
-												className="rounded-xl px-3 py-1.5 text-xs bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90"
-												onClick={() => { if (res.ok) setInput('0x' + (res.value & maskForWidth(width)).toString(16)); }}
-											>Use as Value</button>
-											<button
-												className="rounded-xl px-3 py-1.5 text-xs bg-neutral-200 dark:bg-neutral-800 hover:opacity-90"
-												onClick={() => { if (res.ok) storeToMemory(res.value); }}
-											>Store in Memory</button>
+										<div className="mt-1 font-mono text-xs break-all text-slate-900 dark:text-slate-100">
+											{parsed.ok ? uval.toString() : '—'}
 										</div>
 									</div>
-								);
-							})}
-						</div>
-
-						{/* Memory panel */}
-						<div className="mt-3 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3">
-							<div className="flex items-center gap-2">
-								<div className="font-medium text-sm">Memory</div>
-								<button
-									className="ml-auto text-xs px-2 py-0.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:opacity-90 disabled:opacity-40"
-									onClick={clearMemory}
-									disabled={memory.length === 0}
-								>Clear</button>
+									<div className="rounded-xl border border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-900/80">
+										<div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+											Hex
+										</div>
+										<div className="mt-1 font-mono text-xs text-slate-900 dark:text-slate-100">
+											{parsed.ok ? '0x' + uval.toString(16) : '—'}
+										</div>
+									</div>
+									<div className="rounded-xl border border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-900/80">
+										<div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+											Binary
+										</div>
+										<div className="mt-1 font-mono text-[10px] break-words text-slate-900 dark:text-slate-100">
+											{parsed.ok ? chunkString(binStr, 4).join('_') : '—'}
+										</div>
+									</div>
+								</div>
+								<div className="mt-3 flex flex-wrap items-center gap-3">
+									<div className="flex items-center gap-2">
+										<span className="text-sm text-slate-700 dark:text-slate-300">Width</span>
+										<select
+											className="rounded-lg border border-slate-300 bg-white/90 px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100"
+											value={width}
+											onChange={e => setWidth(parseInt(e.target.value, 10))}
+										>
+											{[8, 16, 24, 32, 48, 64].map(w => (
+												<option key={w} value={w}>
+													{w}
+												</option>
+											))}
+										</select>
+									</div>
+									<label className="inline-flex items-center gap-2 cursor-pointer text-sm text-slate-700 dark:text-slate-300">
+										<input
+											type="checkbox"
+											className="h-4 w-4 rounded border-slate-300 bg-white text-brand-500 dark:border-slate-700 dark:bg-slate-900"
+											checked={signedView}
+											onChange={e => setSignedView(e.target.checked)}
+										/>
+										<span>Show signed</span>
+									</label>
+									{signedView && (
+										<div className="text-sm font-mono px-2 py-1 rounded-lg bg-slate-100 border border-slate-300 text-slate-900 dark:bg-slate-900/90 dark:border-slate-700 dark:text-slate-100">
+											{sval.toString()}
+										</div>
+									)}
+								</div>
 							</div>
-							{memory.length === 0 ? (
-								<div className="text-xs opacity-70 mt-1">Empty. Use "Store in Memory" on a calculator result.</div>
-							) : (
-								<div className="mt-2 space-y-1 text-xs">
-									{memory.map(m => (
-										<div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-800 px-2 py-1">
-											<div className="font-mono text-[11px] px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">{m.label}</div>
-											<div className="font-mono"><span className="opacity-70">dec</span> {m.value.toString()}</div>
-											<div className="font-mono"><span className="opacity-70">hex</span> 0x{m.value.toString(16)}</div>
-											<div className="ml-auto flex gap-1">
-												<button
-													className="text-[11px] px-2 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 hover:opacity-90"
-													onClick={() => useMemoryAsValue(m)}
-												>Use as Value</button>
-												<button
-													className="text-[11px] px-2 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 hover:opacity-90"
-													onClick={() => insertMemoryIntoFirstCalc(m)}
-												>Insert into Calc 1</button>
+
+							{/* Expression Calculators */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs space-y-3 dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="flex items-center gap-3 flex-wrap">
+									<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+										Expression Calculators
+									</div>
+									<label className="inline-flex items-center gap-2 cursor-pointer ml-auto text-xs text-slate-700 dark:text-slate-300">
+										<input
+											type="checkbox"
+											className="h-3.5 w-3.5 rounded border-slate-300 bg-white text-brand-500 dark:border-slate-700 dark:bg-slate-900"
+											checked={maskExprToWidth}
+											onChange={e => setMaskExprToWidth(e.target.checked)}
+										/>
+										<span>Mask to {width}-bit</span>
+									</label>
+									<button
+										className="rounded-xl px-3 py-1 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70"
+										onClick={addCalc}
+									>
+										+ Add calculator
+									</button>
+								</div>
+
+								<div className="space-y-3">
+									{calcs.map((c, idx) => {
+										const res = evalExpression(c.expr, width, maskExprToWidth);
+										let floatView32: string | null = null;
+										let floatView64: string | null = null;
+										if (res.ok) {
+											if (res.float) {
+												floatView32 = formatFloat(bitsToFloat32(float32ToBits(res.float) & maskForWidth(32)));
+												floatView64 = formatFloat(bitsToFloat64(float64ToBits(res.float) & maskForWidth(64)));
+											} else {
+												floatView32 = formatFloat(bitsToFloat32(res.value));
+												floatView64 = formatFloat(bitsToFloat64(res.value));
+											}
+										}
+
+										return (
+											<div
+												key={c.id}
+												className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2 shadow-soft dark:border-slate-800 dark:bg-slate-900/80"
+											>
+												<div className="flex items-center gap-2">
+													<div className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+														Calc {idx + 1}
+													</div>
+													{calcs.length > 1 && (
+														<button
+															className="ml-auto text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70"
+															onClick={() => removeCalc(c.id)}
+														>
+															Remove
+														</button>
+													)}
+												</div>
+												<input
+													className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:border-brand-500/70 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100 dark:placeholder:text-slate-500"
+													value={c.expr}
+													onChange={e =>
+														setCalcs(prev =>
+															prev.map(cc =>
+																cc.id === c.id ? { ...cc, expr: e.target.value } : cc,
+															),
+														)
+													}
+													placeholder="Examples: 0x45 & 0b100001 + 9, (1<<23) | 5, 3.14 * (1<<8)"
+												/>
+												{res.ok ? (
+													<>
+														<div className="grid grid-cols-3 gap-2">
+															<div className="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950/70">
+																<div className="text-[11px] text-slate-500 dark:text-slate-400">
+																	Decimal
+																</div>
+																<div className="mt-1 font-mono text-[11px] break-all text-slate-900 dark:text-slate-100">
+																	{res.value.toString()}
+																</div>
+															</div>
+															<div className="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950/70">
+																<div className="text-[11px] text-slate-500 dark:text-slate-400">
+																	Hex
+																</div>
+																<div className="mt-1 font-mono text-[11px] text-slate-900 dark:text-slate-100">
+																	{'0x' + res.value.toString(16)}
+																</div>
+															</div>
+															<div className="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950/70">
+																<div className="text-[11px] text-slate-500 dark:text-slate-400">
+																	Binary
+																</div>
+																<div className="mt-1 font-mono text-[10px] break-words text-slate-900 dark:text-slate-100">
+																	{chunkString(
+																		res.value.toString(2).padStart(width, '0'),
+																		4,
+																	).join('_')}
+																</div>
+															</div>
+														</div>
+														<div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-slate-700 dark:text-slate-300">
+															<div className="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-950/70">
+																<div className="text-slate-500 dark:text-slate-400">
+																	As f32
+																</div>
+																<div className="font-mono overflow-hidden text-ellipsis">
+																	{floatView32}
+																</div>
+															</div>
+															<div className="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-950/70">
+																<div className="text-slate-500 dark:text-slate-400">
+																	As f64
+																</div>
+																<div className="font-mono overflow-hidden text-ellipsis">
+																	{floatView64}
+																</div>
+															</div>
+														</div>
+													</>
+												) : (
+													<div className="text-xs text-red-600 dark:text-red-400">
+														{res.error}
+													</div>
+												)}
+												<div className="flex flex-wrap gap-2 mt-1">
+													<button
+														className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 text-slate-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
+														onClick={() => {
+															if (res.ok)
+																setInput(
+																	'0x' +
+																	(res.value & maskForWidth(width)).toString(16),
+																);
+														}}
+													>
+														Use as Value
+													</button>
+													<button
+														className="rounded-xl px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70 dark:focus:ring-offset-slate-900 focus:ring-offset-2"
+														onClick={() => {
+															if (res.ok) storeToMemory(res.value);
+														}}
+													>
+														Store in Memory
+													</button>
+												</div>
+											</div>
+										);
+									})}
+								</div>
+
+								{/* Memory panel */}
+								<div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/80">
+									<div className="flex items-center gap-2">
+										<div className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+											Memory
+										</div>
+										<button
+											className="ml-auto text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-noneFocus:ring-1 focus:ring-slate-300 disabled:opacity-40 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70"
+											onClick={clearMemory}
+											disabled={memory.length === 0}
+										>
+											Clear
+										</button>
+									</div>
+									{memory.length === 0 ? (
+										<div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+											Empty. Use <span className="font-mono">Store in Memory</span> on a
+											calculator result.
+										</div>
+									) : (
+										<div className="mt-2 space-y-1 text-xs">
+											{memory.map(m => (
+												<div
+													key={m.id}
+													className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-950/70"
+												>
+													<div className="font-mono text-[11px] px-1 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-300 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700">
+														{m.label}
+													</div>
+													<div className="font-mono text-slate-800 dark:text-slate-200">
+														<span className="text-slate-500 dark:text-slate-400">
+															dec
+														</span>{' '}
+														{m.value.toString()}
+													</div>
+													<div className="font-mono text-slate-800 dark:text-slate-200">
+														<span className="text-slate-500 dark:text-slate-400">
+															hex
+														</span>{' '}
+														0x{m.value.toString(16)}
+													</div>
+													<div className="ml-auto flex gap-1">
+														<button
+															className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70"
+															onClick={() => useMemoryAsValue(m)}
+														>
+															Use as Value
+														</button>
+														<button
+															className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70"
+															onClick={() => insertMemoryIntoFirstCalc(m)}
+														>
+															Insert into Calc 1
+														</button>
+													</div>
+												</div>
+											))}
+										</div>
+									)}
+								</div>
+							</div>
+
+							{/* ASCII Converter */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs space-y-3 dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+									ASCII Converter
+								</div>
+								<div className="grid md:grid-cols-2 gap-3">
+									<div>
+										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Text → codes
+										</label>
+										<textarea
+											className="mt-1 w-full h-20 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100 dark:placeholder:text-slate-500"
+											value={asciiText}
+											onChange={e => setAsciiText(e.target.value)}
+										/>
+										<div className="mt-2 text-xs text-slate-700 dark:text-slate-300">
+											<div className="text-slate-500 dark:text-slate-400">Hex bytes</div>
+											<div className="mt-0.5 font-mono break-words text-slate-900 dark:text-slate-100">
+												{asciiTextCodes.hex.join(' ') || '—'}
+											</div>
+											<div className="mt-2 text-slate-500 dark:text-slate-400">
+												Decimal codes
+											</div>
+											<div className="mt-0.5 font-mono break-words text-slate-900 dark:text-slate-100">
+												{asciiTextCodes.dec.join(' ') || '—'}
+											</div>
+										</div>
+									</div>
+									<div>
+										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Codes → text
+										</label>
+										<textarea
+											className="mt-1 w-full h-20 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100 dark:placeholder:text-slate-500"
+											value={asciiNums}
+											onChange={e => setAsciiNums(e.target.value)}
+											placeholder="0x41 0x42 67 0b1000001"
+										/>
+										<div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+											Interprets tokens using the same parser (0x.., 0b.., decimal). Values are
+											masked to 0xFF.
+										</div>
+										<div className="mt-1 text-sm text-slate-800 dark:text-slate-200">
+											<span className="text-slate-500 dark:text-slate-400">Result:</span>{' '}
+											<span className="font-mono text-slate-900 dark:text-slate-100">
+												{asciiNumsResult || '—'}
+											</span>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							{/* Floating-point Registers */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs space-y-3 dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="flex items-center gap-3">
+									<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+										Floating-point Registers
+									</div>
+									<select
+										className="ml-auto rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
+										value={floatMode}
+										onChange={e => setFloatMode(e.target.value as 'f32' | 'f64')}
+									>
+										<option value="f32">32-bit (float)</option>
+										<option value="f64">64-bit (double)</option>
+									</select>
+								</div>
+								<div className="grid md:grid-cols-2 gap-3">
+									{/* Value → Bits */}
+									<div className="space-y-2">
+										<div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Value → bits
+										</div>
+										<input
+											className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+											value={floatValueInput}
+											onChange={e => setFloatValueInput(e.target.value)}
+											placeholder="e.g. 1.0, -0.5, 3.1415926"
+										/>
+										{floatFromValue.ok ? (
+											<div className="text-xs space-y-1 text-slate-800 dark:text-slate-200">
+												<div>
+													<span className="text-slate-500 dark:text-slate-400">
+														Bits (hex):{' '}
+													</span>
+													<span className="font-mono text-slate-900 dark:text-slate-100">
+														0x
+														{floatFromValue.bits
+															.toString(16)
+															.padStart(floatMode === 'f32' ? 8 : 16, '0')}
+													</span>
+												</div>
+												<div>
+													<span className="text-slate-500 dark:text-slate-400">
+														Bits (bin):{' '}
+													</span>
+													<span className="font-mono break-words text-slate-900 dark:text-slate-100">
+														{chunkString(
+															toBin(
+																floatFromValue.bits &
+																maskForWidth(
+																	floatMode === 'f32' ? 32 : 64,
+																),
+																floatMode === 'f32' ? 32 : 64,
+															),
+															4,
+														).join('_')}
+													</span>
+												</div>
+											</div>
+										) : (
+											<div className="text-xs text-red-600 dark:text-red-400">
+												{floatFromValue.error}
+											</div>
+										)}
+									</div>
+
+									{/* Bits → Value */}
+									<div className="space-y-2">
+										<div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Bits → value
+										</div>
+										<input
+											className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+											value={floatBitsInput}
+											onChange={e => setFloatBitsInput(e.target.value)}
+											placeholder={
+												floatMode === 'f32'
+													? 'e.g. 0x3f800000'
+													: 'e.g. 0x3ff0000000000000'
+											}
+										/>
+										{floatFromBits.ok ? (
+											<div className="text-xs space-y-1 text-slate-800 dark:text-slate-200">
+												<div>
+													<span className="text-slate-500 dark:text-slate-400">
+														Value:{' '}
+													</span>
+													<span className="font-mono text-slate-900 dark:text-slate-100">
+														{formatFloat(floatFromBits.value)}
+													</span>
+												</div>
+												<div>
+													<span className="text-slate-500 dark:text-slate-400">
+														Bits (hex):{' '}
+													</span>
+													<span className="font-mono text-slate-900 dark:text-slate-100">
+														0x
+														{floatFromBits.bits
+															.toString(16)
+															.padStart(floatMode === 'f32' ? 8 : 16, '0')}
+													</span>
+												</div>
+											</div>
+										) : (
+											<div className="text-xs text-red-600 dark:text-red-400">
+												{floatFromBits.error}
+											</div>
+										)}
+									</div>
+								</div>
+
+								{/* Sign / exponent / mantissa breakdown */}
+								<div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-2 dark:border-slate-800 dark:bg-slate-950/80">
+									<div className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+										Bit layout
+									</div>
+									{floatLayout ? (
+										<>
+											<div className="font-mono break-words text-slate-900 dark:text-slate-100">
+												<span className="text-slate-500 dark:text-slate-400">sign</span>{' '}
+												<span className="px-1 rounded bg-slate-100 border border-slate-300 dark:bg-slate-900 dark:border-slate-700">
+													{floatLayout.signBit}
+												</span>{' '}
+												<span className="ml-2 text-slate-500 dark:text-slate-400">
+													exp
+												</span>{' '}
+												<span className="px-1 rounded bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60">
+													{chunkString(floatLayout.expStr, 4).join('_')}
+												</span>{' '}
+												<span className="ml-2 text-slate-500 dark:text-slate-400">
+													mant
+												</span>{' '}
+												<span className="px-1 rounded bg-sky-50 border border-sky-200 dark:bg-sky-950/40 dark:border-sky-800/60">
+													{chunkString(floatLayout.fracStr, 4).join('_')}
+												</span>
+											</div>
+											<div className="space-y-1 text-slate-800 dark:text-slate-200">
+												<div>
+													Exponent raw:{' '}
+													<span className="font-mono text-slate-900 dark:text-slate-100">
+														{floatLayout.expRaw}
+													</span>
+												</div>
+												<div>
+													Exponent (unbiased):{' '}
+													<span className="font-mono text-slate-900 dark:text-slate-100">
+														{String(floatLayout.exponent)}
+													</span>
+												</div>
+												<div>
+													Kind:{' '}
+													<span className="font-mono text-slate-900 dark:text-slate-100">
+														{floatLayout.kind}
+													</span>
+												</div>
+												{floatLayout.kind === 'normal' ||
+													floatLayout.kind === 'subnormal' ? (
+													<div>
+														Mantissa (conceptual):{' '}
+														<span className="font-mono text-slate-900 dark:text-slate-100">
+															{floatLayout.mantissaDescr}
+														</span>
+													</div>
+												) : (
+													<div>
+														Mantissa:{' '}
+														<span className="font-mono text-slate-900 dark:text-slate-100">
+															{floatLayout.mantissaDescr}
+														</span>
+													</div>
+												)}
+											</div>
+										</>
+									) : (
+										<div className="text-slate-600 dark:text-slate-400">
+											Enter a value or bits to see sign / exponent / mantissa layout.
+										</div>
+									)}
+								</div>
+							</div>
+						</section>
+
+						{/* Right column: bit labels, bitfields, masks, endian, codegen, tests, help */}
+						<section className="md:col-span-2 space-y-4">
+							{/* Bit Labels */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="flex items-center gap-2">
+									<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+										Bit Labels
+									</div>
+								</div>
+								<textarea
+									className="mt-2 w-full h-24 rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+									value={labelSpec}
+									onChange={e => setLabelSpec(e.target.value)}
+									placeholder="7:READY,5-3:MODE,0:EN"
+								/>
+								<div className="mt-3 grid grid-cols-4 sm:grid-cols-8 md:grid-cols-8 lg:grid-cols-8 gap-2">
+									{Array.from({ length: width }).map((_, i) => {
+										const bit = width - 1 - i;
+										const isSet = ((uval >> BigInt(bit)) & 1n) === 1n;
+										const label = labels.find(
+											r => bit <= r.start && bit >= r.end,
+										);
+										return (
+											<button
+												key={bit}
+												onClick={() => setBit(bit, !isSet)}
+												className={`group rounded-xl border px-2 py-1 text-left text-xs shadow-soft transition ${isSet
+														? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800/70 dark:text-emerald-100'
+														: 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-950/60 dark:border-slate-800/80 dark:text-slate-200'
+													}`}
+											>
+												<div className="text-[10px] text-slate-500 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300">
+													bit {bit}
+												</div>
+												<div
+													className="font-semibold truncate"
+													title={label?.name ?? ''}
+												>
+													{label?.name ?? (isSet ? '1' : '0')}
+												</div>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+
+							{/* Bitfield Editor */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs space-y-3 dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+									Bitfields
+								</div>
+								<div className="flex items-end gap-3 flex-wrap">
+									<div>
+										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Field hi (bit)
+										</label>
+										<input
+											type="number"
+											className="mt-1 w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
+											value={fieldHi}
+											onChange={e =>
+												setFieldHi(
+													Math.min(
+														Math.max(parseInt(e.target.value || '0', 10), 0),
+														width - 1,
+													),
+												)
+											}
+										/>
+									</div>
+									<div>
+										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Field lo (bit)
+										</label>
+										<input
+											type="number"
+											className="mt-1 w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
+											value={fieldLo}
+											onChange={e =>
+												setFieldLo(
+													Math.min(
+														Math.max(parseInt(e.target.value || '0', 10), 0),
+														width - 1,
+													),
+												)
+											}
+										/>
+									</div>
+									<div className="text-sm text-slate-700 dark:text-slate-200">
+										len ={' '}
+										<span className="font-mono text-slate-900 dark:text-slate-100">
+											{fieldLen}
+										</span>
+									</div>
+									<div className="ml-auto text-sm text-slate-700 dark:text-slate-200">
+										current ={' '}
+										<span className="font-mono text-slate-900 dark:text-slate-100">
+											{parsed.ok ? '0x' + fieldValue.toString(16) : '—'}
+										</span>{' '}
+										(
+										<span className="font-mono text-slate-900 dark:text-slate-100">
+											{fieldValue.toString()}
+										</span>
+										)
+									</div>
+								</div>
+								<div className="flex items-end gap-2 flex-wrap">
+									<input
+										className="w-48 rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+										value={fieldValInput}
+										onChange={e => setFieldValInput(e.target.value)}
+										placeholder="value (hex/dec/bin)"
+									/>
+									<button
+										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 text-slate-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
+										onClick={() => {
+											const p = parseNumber(fieldValInput);
+											if (!p.ok) return;
+											const len = fieldLen;
+											const max = (1n << BigInt(len)) - 1n;
+											insertField(fieldHi, len, p.value & max);
+										}}
+									>
+										Set field
+									</button>
+								</div>
+							</div>
+
+							{/* Masks */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs space-y-2 dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+									Masks
+								</div>
+								<div className="grid sm:grid-cols-2 gap-2">
+									<div>
+										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Set mask
+										</label>
+										<input
+											className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+											value={setMaskStr}
+											onChange={e => setSetMask(e.target.value)}
+											placeholder="e.g. 0xF0"
+										/>
+									</div>
+									<div>
+										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+											Clear mask
+										</label>
+										<input
+											className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+											value={clrMaskStr}
+											onChange={e => setClrMask(e.target.value)}
+											placeholder="e.g. 0b1111"
+										/>
+									</div>
+								</div>
+								<div className="flex gap-2 mt-1 flex-wrap">
+									<button
+										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-50 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70 dark:focus:ring-offset-slate-900"
+										onClick={() => applyMasks(setMaskStr, '0')}
+									>
+										Apply Set
+									</button>
+									<button
+										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 focus:ring-offset-slate-50 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70 dark:focus:ring-offset-slate-900"
+										onClick={() => applyMasks('0', clrMaskStr)}
+									>
+										Apply Clear
+									</button>
+									<button
+										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 text-slate-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
+										onClick={() => applyMasks(setMaskStr, clrMaskStr)}
+									>
+										Apply Both
+									</button>
+								</div>
+							</div>
+
+							{/* Endianness */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 mb-1">
+									Endian View
+								</div>
+								<div className="grid grid-cols-2 gap-4 text-sm">
+									<div>
+										<div className="text-slate-600 dark:text-slate-400">
+											Little-endian bytes (LSB→MSB)
+										</div>
+										<div className="mt-1 flex flex-wrap gap-1 font-mono text-xs">
+											{leBytes.map((b, i) => (
+												<span
+													key={i}
+													className="rounded-lg px-2 py-1 bg-slate-50 border border-slate-200 text-slate-900 dark:bg-slate-950/80 dark:border-slate-800 dark:text-slate-100"
+												>
+													{b}
+												</span>
+											))}
+										</div>
+									</div>
+									<div>
+										<div className="text-slate-600 dark:text-slate-400">
+											Big-endian bytes (MSB→LSB)
+										</div>
+										<div className="mt-1 flex flex-wrap gap-1 font-mono text-xs">
+											{beBytes.map((b, i) => (
+												<span
+													key={i}
+													className="rounded-lg px-2 py-1 bg-slate-50 border border-slate-200 text-slate-900 dark:bg-slate-950/80 dark:border-slate-800 dark:text-slate-100"
+												>
+													{b}
+												</span>
+											))}
+										</div>
+									</div>
+								</div>
+							</div>
+
+							{/* Codegen */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="flex items-center justify-between gap-2">
+									<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+										C Macros / Snippets
+									</div>
+									<button
+										className="rounded-lg px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70"
+										onClick={() => navigator.clipboard.writeText(codeGen)}
+									>
+										Copy
+									</button>
+								</div>
+								<pre className="mt-2 p-3 rounded-2xl bg-slate-50 border border-slate-200 overflow-auto text-xs text-slate-900 dark:bg-slate-950/80 dark:border-slate-800 dark:text-slate-100">
+									<code>{codeGen}</code>
+								</pre>
+							</div>
+
+							{/* Calculator Self-tests */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-slate-800/70 dark:bg-slate-900/70">
+								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+									Calculator Self-tests
+								</div>
+								<p className="text-[11px] text-slate-600 mt-1 dark:text-slate-400">
+									Precedence (custom): multiplicative &gt; bitwise AND &gt; additive &gt; shifts
+									&gt; XOR &gt; OR.
+								</p>
+								<div className="mt-2 space-y-1 text-sm">
+									{testResults.map((t, i) => (
+										<div
+											key={i}
+											className={`flex items-center justify-between rounded-lg border px-2 py-1 text-[11px] ${t.ok
+													? 'border-emerald-300/70 bg-emerald-50 text-emerald-900 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-100'
+													: 'border-red-300/70 bg-red-50 text-red-900 dark:border-red-700/70 dark:bg-red-950/40 dark:text-red-100'
+												}`}
+										>
+											<div className="font-mono mr-2 truncate">{t.expr}</div>
+											<div className="font-mono">
+												expected {t.expectDec}, got {t.got} {t.ok ? '✓' : '✗'}
 											</div>
 										</div>
 									))}
 								</div>
-							)}
-						</div>
-					</div>
+							</div>
 
-					{/* ASCII Converter */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow space-y-3">
-						<div className="font-medium">ASCII Converter</div>
-						<div className="grid md:grid-cols-2 gap-3">
-							<div>
-								<label className="text-sm font-medium">Text → codes</label>
-								<textarea
-									className="mt-1 w-full h-20 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm font-mono"
-									value={asciiText}
-									onChange={e => setAsciiText(e.target.value)}
-								/>
-								<div className="mt-2 text-xs">
-									<div className="opacity-70">Hex bytes</div>
-									<div className="font-mono break-words">{asciiTextCodes.hex.join(' ') || '—'}</div>
-									<div className="opacity-70 mt-1">Decimal codes</div>
-									<div className="font-mono break-words">{asciiTextCodes.dec.join(' ') || '—'}</div>
+							{/* Help */}
+							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs text-sm text-slate-800 space-y-2 dark:border-slate-800/70 dark:bg-slate-900/70 dark:text-slate-200">
+								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+									Tips
 								</div>
+								<ul className="list-disc pl-5 space-y-1 text-xs text-slate-700 dark:text-slate-300">
+									<li>
+										Inputs accept <span className="font-mono">0x..</span>,{' '}
+										<span className="font-mono">0b..</span>,{' '}
+										<span className="font-mono">...h</span>,{' '}
+										<span className="font-mono">...b</span> and underscores.
+									</li>
+									<li>
+										Use multiple calculators for different expressions; results can be stored in
+										memory and reused.
+									</li>
+									<li>
+										Calculator results are also decoded as{' '}
+										<span className="font-mono">f32</span> and{' '}
+										<span className="font-mono">f64</span> using their bit patterns.
+									</li>
+									<li>
+										Memory values can feed back into the main value or be inserted into Calculator
+										1.
+									</li>
+									<li>
+										ASCII converter is useful for debugging registers that hold characters (e.g.,
+										UART data or ID strings).
+									</li>
+									<li>
+										Toggle bits directly; use <em>Masks</em> to set/clear many bits at once.
+									</li>
+									<li>
+										Define labels like <span className="font-mono">23:ERR, 22-16:MODE</span> to
+										annotate fields. Code macros update automatically.
+									</li>
+									<li>Endian view shows how the value maps to bytes for the selected width.</li>
+									<li>
+										The floating-point section lets you move between values and IEEE-754 bit
+										layouts, and breaks out sign / exponent / mantissa.
+									</li>
+								</ul>
 							</div>
-							<div>
-								<label className="text-sm font-medium">Codes → text</label>
-								<textarea
-									className="mt-1 w-full h-20 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm font-mono"
-									value={asciiNums}
-									onChange={e => setAsciiNums(e.target.value)}
-									placeholder="0x41 0x42 67 0b1000001"
-								/>
-								<div className="mt-2 text-xs opacity-70">Interprets tokens using the same parser (0x.., 0b.., decimal). Values are masked to 0xFF.</div>
-								<div className="mt-1 text-sm">
-									<span className="opacity-70">Result:</span>{' '}
-									<span className="font-mono">{asciiNumsResult || '—'}</span>
-								</div>
-							</div>
-						</div>
+						</section>
 					</div>
-
-
-					{/* Floating-point Registers */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow space-y-3">
-						<div className="flex items-center gap-3">
-							<div className="font-medium">Floating-point Registers</div>
-							<select
-								className="ml-auto rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1 text-sm"
-								value={floatMode}
-								onChange={e => setFloatMode(e.target.value as 'f32' | 'f64')}
-							>
-								<option value="f32">32-bit (float)</option>
-								<option value="f64">64-bit (double)</option>
-							</select>
-						</div>
-						<div className="grid md:grid-cols-2 gap-3">
-							{/* Value → Bits */}
-							<div className="space-y-2">
-								<div className="text-sm font-medium">Value → bits</div>
-								<input
-									className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1 font-mono text-sm"
-									value={floatValueInput}
-									onChange={e => setFloatValueInput(e.target.value)}
-									placeholder="e.g. 1.0, -0.5, 3.1415926"
-								/>
-								{floatFromValue.ok ? (
-									<div className="text-xs space-y-1">
-										<div>
-											<span className="opacity-70">Bits (hex): </span>
-											<span className="font-mono">
-												0x{floatFromValue.bits.toString(16).padStart(floatMode === 'f32' ? 8 : 16, '0')}
-											</span>
-										</div>
-										<div>
-											<span className="opacity-70">Bits (bin): </span>
-											<span className="font-mono break-words">
-												{chunkString(
-													toBin(floatFromValue.bits & maskForWidth(floatMode === 'f32' ? 32 : 64), floatMode === 'f32' ? 32 : 64),
-													4
-												).join('_')}
-											</span>
-										</div>
-									</div>
-								) : (
-									<div className="text-xs text-red-600 dark:text-red-400">{floatFromValue.error}</div>
-								)}
-							</div>
-
-							{/* Bits → Value */}
-							<div className="space-y-2">
-								<div className="text-sm font-medium">Bits → value</div>
-								<input
-									className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1 font-mono text-sm"
-									value={floatBitsInput}
-									onChange={e => setFloatBitsInput(e.target.value)}
-									placeholder={floatMode === 'f32' ? "e.g. 0x3f800000" : "e.g. 0x3ff0000000000000"}
-								/>
-								{floatFromBits.ok ? (
-									<div className="text-xs space-y-1">
-										<div>
-											<span className="opacity-70">Value: </span>
-											<span className="font-mono">{formatFloat(floatFromBits.value)}</span>
-										</div>
-										<div>
-											<span className="opacity-70">Bits (hex): </span>
-											<span className="font-mono">
-												0x{floatFromBits.bits.toString(16).padStart(floatMode === 'f32' ? 8 : 16, '0')}
-											</span>
-										</div>
-									</div>
-								) : (
-									<div className="text-xs text-red-600 dark:text-red-400">{floatFromBits.error}</div>
-								)}
-							</div>
-						</div>
-
-						{/* Sign / exponent / mantissa breakdown */}
-						<div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 text-xs space-y-2">
-							<div className="font-medium text-sm mb-1">Bit layout</div>
-							{floatLayout ? (
-								<>
-									<div className="font-mono break-words">
-										<span className="opacity-70">sign</span>{' '}
-										<span className="px-1 rounded bg-neutral-100 dark:bg-neutral-800">{floatLayout.signBit}</span>{' '}
-										<span className="opacity-70 ml-2">exp</span>{' '}
-										<span className="px-1 rounded bg-amber-100 dark:bg-amber-900/40">
-											{chunkString(floatLayout.expStr, 4).join('_')}
-										</span>{' '}
-										<span className="opacity-70 ml-2">mant</span>{' '}
-										<span className="px-1 rounded bg-blue-100 dark:bg-blue-900/40">
-											{chunkString(floatLayout.fracStr, 4).join('_')}
-										</span>
-									</div>
-									<div>
-										<div>Exponent raw: <span className="font-mono">{floatLayout.expRaw}</span></div>
-										<div>Exponent (unbiased): <span className="font-mono">{String(floatLayout.exponent)}</span></div>
-										<div>Kind: <span className="font-mono">{floatLayout.kind}</span></div>
-										{floatLayout.kind === 'normal' || floatLayout.kind === 'subnormal' ? (
-											<div>Mantissa (conceptual): <span className="font-mono">{floatLayout.mantissaDescr}</span></div>
-										) : (
-											<div>Mantissa: <span className="font-mono">{floatLayout.mantissaDescr}</span></div>
-										)}
-									</div>
-								</>
-							) : (
-								<div className="opacity-70">Enter a value or bits to see sign / exponent / mantissa layout.</div>
-							)}
-						</div>
-					</div>
-
-
-
-
-				</section>
-
-				{/* Bits + Labels + Endianness + Float regs + Codegen + Tests + Help */}
-				<section className="md:col-span-2 space-y-3">
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow">
-						<div className="flex items-center gap-2">
-							<div className="font-medium">Bit Labels</div>
-						</div>
-						<textarea className="mt-2 w-full h-24 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 font-mono text-sm"
-							value={labelSpec}
-							onChange={e => setLabelSpec(e.target.value)}
-							placeholder="7:READY,5-3:MODE,0:EN" />
-						<div className="mt-3 grid grid-cols-4 sm:grid-cols-8 md:grid-cols-8 lg:grid-cols-8 gap-2">
-							{Array.from({ length: width }).map((_, i) => {
-								const bit = width - 1 - i; // MSB first
-								const isSet = ((uval >> BigInt(bit)) & 1n) === 1n;
-								const label = labels.find(r => bit <= r.start && bit >= r.end);
-								return (
-									<button key={bit}
-										onClick={() => setBit(bit, !isSet)}
-										className={`group rounded-xl border text-left px-2 py-1 transition shadow-sm ${isSet ? 'bg-emerald-100/70 dark:bg-emerald-900/30 border-emerald-300/60 dark:border-emerald-700/40' : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-300/60 dark:border-neutral-800'}`}>
-										<div className="text-[10px] opacity-70">bit {bit}</div>
-										<div className="text-xs font-semibold truncate" title={label?.name ?? ''}>{label?.name ?? (isSet ? '1' : '0')}</div>
-									</button>
-								);
-							})}
-						</div>
-					</div>
-
-					{/* Bitfield Editor */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow space-y-3">
-						<div className="font-medium">Bitfields</div>
-						<div className="flex items-end gap-3 flex-wrap">
-							<div>
-								<label className="text-sm font-medium">Field hi (bit)</label>
-								<input type="number" className="w-24 ml-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1"
-									value={fieldHi}
-									onChange={e => setFieldHi(Math.min(Math.max(parseInt(e.target.value || '0', 10), 0), width - 1))} />
-							</div>
-							<div>
-								<label className="text-sm font-medium">Field lo (bit)</label>
-								<input type="number" className="w-24 ml-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1"
-									value={fieldLo}
-									onChange={e => setFieldLo(Math.min(Math.max(parseInt(e.target.value || '0', 10), 0), width - 1))} />
-							</div>
-							<div className="text-sm">len = <span className="font-mono">{fieldLen}</span></div>
-							<div className="ml-auto text-sm">current = <span className="font-mono">{parsed.ok ? '0x' + fieldValue.toString(16) : '—'}</span> (<span className="font-mono">{fieldValue.toString()}</span>)</div>
-						</div>
-						<div className="flex items-end gap-2 flex-wrap">
-							<input
-								className="w-48 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1 font-mono"
-								value={fieldValInput}
-								onChange={e => setFieldValInput(e.target.value)}
-								placeholder="value (hex/dec/bin)"
-							/>
-							<button
-								className="rounded-xl px-3 py-1.5 bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90"
-								onClick={() => {
-									const p = parseNumber(fieldValInput);
-									if (!p.ok) return;
-									const len = fieldLen;
-									const max = (1n << BigInt(len)) - 1n;
-									insertField(fieldHi, len, p.value & max);
-								}}
-							>Set field</button>
-						</div>
-					</div>
-
-					{/* Masks */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow space-y-2">
-						<div className="font-medium">Masks</div>
-						<div className="grid sm:grid-cols-2 gap-2">
-							<div>
-								<label className="text-sm">Set mask</label>
-								<input className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1 font-mono" value={setMaskStr} onChange={e => setSetMask(e.target.value)} placeholder="e.g. 0xF0" />
-							</div>
-							<div>
-								<label className="text-sm">Clear mask</label>
-								<input className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-2 py-1 font-mono" value={clrMaskStr} onChange={e => setClrMask(e.target.value)} placeholder="e.g. 0b1111" />
-							</div>
-						</div>
-						<div className="flex gap-2">
-							<button className="rounded-xl px-3 py-1.5 bg-neutral-200 dark:bg-neutral-800 hover:opacity-90" onClick={() => applyMasks(setMaskStr, '0')}>Apply Set</button>
-							<button className="rounded-xl px-3 py-1.5 bg-neutral-200 dark:bg-neutral-800 hover:opacity-90" onClick={() => applyMasks('0', clrMaskStr)}>Apply Clear</button>
-							<button className="rounded-xl px-3 py-1.5 bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90" onClick={() => applyMasks(setMaskStr, clrMaskStr)}>Apply Both</button>
-						</div>
-					</div>
-
-					{/* Endianness */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow">
-						<div className="font-medium mb-2">Endian View</div>
-						<div className="grid grid-cols-2 gap-4">
-							<div>
-								<div className="text-sm opacity-80">Little-endian bytes (LSB→MSB)</div>
-								<div className="mt-1 flex flex-wrap gap-1 font-mono">
-									{leBytes.map((b, i) => (<span key={i} className="rounded-lg px-2 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">{b}</span>))}
-								</div>
-							</div>
-							<div>
-								<div className="text-sm opacity-80">Big-endian bytes (MSB→LSB)</div>
-								<div className="mt-1 flex flex-wrap gap-1 font-mono">
-									{beBytes.map((b, i) => (<span key={i} className="rounded-lg px-2 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">{b}</span>))}
-								</div>
-							</div>
-						</div>
-					</div>
-
-					{/* Codegen */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow">
-						<div className="flex items-center justify-between gap-2">
-							<div className="font-medium">C Macros / Snippets</div>
-							<button className="rounded-lg px-2 py-1 bg-neutral-200 dark:bg-neutral-800 text-sm" onClick={() => navigator.clipboard.writeText(codeGen)}>Copy</button>
-						</div>
-						<pre className="mt-2 p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 overflow-auto text-xs"><code>{codeGen}</code></pre>
-					</div>
-
-					{/* Calculator Self-tests */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow">
-						<div className="font-medium">Calculator Self-tests</div>
-						<p className="text-xs opacity-70 mt-1">Precedence (custom): multiplicative &gt; bitwise AND &gt; additive &gt; shifts &gt; XOR &gt; OR.</p>
-						<div className="mt-2 space-y-1 text-sm">
-							{testResults.map((t, i) => (
-								<div key={i} className={`flex items-center justify-between rounded-lg border px-2 py-1 ${t.ok ? 'border-emerald-300/60 dark:border-emerald-700/40' : 'border-red-300/60 dark:border-red-700/40'}`}>
-									<div className="font-mono text-xs mr-2">{t.expr}</div>
-									<div className="font-mono text-[11px]">expected {t.expectDec}, got {t.got} {t.ok ? '✓' : '✗'}</div>
-								</div>
-							))}
-						</div>
-					</div>
-
-					{/* Help */}
-					<div className="rounded-2xl p-4 bg-white dark:bg-neutral-900 shadow text-sm opacity-90 space-y-2">
-						<div className="font-medium">Tips</div>
-						<ul className="list-disc pl-5 space-y-1">
-							<li>Inputs accept <span className="font-mono">0x..</span>, <span className="font-mono">0b..</span>, <span className="font-mono">...h</span>, <span className="font-mono">...b</span> and underscores.</li>
-							<li>Use multiple calculators for different expressions; results can be stored in memory and reused.</li>
-							<li>Calculator results are also decoded as <span className="font-mono">f32</span> and <span className="font-mono">f64</span> using their bit patterns.</li>
-							<li>Memory values can feed back into the main value or be inserted into Calculator 1.</li>
-							<li>ASCII converter is useful for debugging registers that hold characters (e.g., UART data or ID strings).</li>
-							<li>Toggle bits directly; use <em>Masks</em> to set/clear many bits at once.</li>
-							<li>Define labels like <span className="font-mono">23:ERR, 22-16:MODE</span> to annotate fields. Code macros update automatically.</li>
-							<li>Endian view shows how the value maps to bytes for the selected width.</li>
-							<li>The floating-point section lets you move between values and IEEE-754 bit layouts, and breaks out sign / exponent / mantissa.</li>
-						</ul>
-					</div>
-				</section>
+				</div>
 			</div>
 		</div>
 	);
