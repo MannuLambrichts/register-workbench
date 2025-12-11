@@ -998,9 +998,9 @@ export default function RegisterWorkbench() {
 														{res.error}
 													</div>
 												)}
-												<div className="flex flex-wrap gap-2 mt-1">
+												<div className="flex flex-wrap gap-2">
 													<button
-														className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 text-slate-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
+														className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 dark:bg-brand-700 text-slate-950 dark:text-slate-100 hover:bg-brand-400 dark:hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
 														onClick={() => {
 															if (res.ok)
 																setInput(
@@ -1012,7 +1012,7 @@ export default function RegisterWorkbench() {
 														Use as Value
 													</button>
 													<button
-														className="rounded-xl px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-800 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70 dark:focus:ring-offset-slate-900 focus:ring-offset-2"
+														className="rounded-xl px-3 py-1.5 text-xs font-medium bg-slate-200 text-slate-800 hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/80 dark:focus:ring-slate-600/70 dark:focus:ring-offset-slate-900 focus:ring-offset-2"
 														onClick={() => {
 															if (res.ok) storeToMemory(res.value);
 														}}
@@ -1439,7 +1439,7 @@ export default function RegisterWorkbench() {
 										placeholder="value (hex/dec/bin)"
 									/>
 									<button
-										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 text-slate-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
+										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 dark:bg-brand-700 text-slate-950 dark:text-slate-100 hover:bg-brand-400 dark:hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
 										onClick={() => {
 											const p = parseNumber(fieldValInput);
 											if (!p.ok) return;
@@ -1496,7 +1496,7 @@ export default function RegisterWorkbench() {
 										Apply Clear
 									</button>
 									<button
-										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 text-slate-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
+										className="rounded-xl px-3 py-1.5 text-xs font-medium bg-brand-500 dark:bg-brand-700 text-slate-950 dark:text-slate-100 hover:bg-brand-400 dark:hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/70 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900"
 										onClick={() => applyMasks(setMaskStr, clrMaskStr)}
 									>
 										Apply Both
