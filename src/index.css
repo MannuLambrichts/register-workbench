@@ -1,0 +1,39 @@
+@tailwind base;
+
+@tailwind components;
+
+@tailwind utilities;
+
+
+html,body,#root {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+html,body {
+  font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,Helvetica Neue,Arial,sans-serif!important;
+}
+
+button,input,textarea,select {
+  font-family: inherit;
+}
+
+html {
+  background-color: #fff;
+}
+
+html.dark {
+  background-color: #212121;
+}
+
+html.mobileSkybridge.dark {
+  background-color: #000;
+}
+
+@supports (font:-apple-system-body) {
+  html.mobileSkybridge {
+    font: -apple-system-body;
+  }
+}
