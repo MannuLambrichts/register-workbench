@@ -538,8 +538,8 @@ export default function RegisterWorkbench() {
 	const [width, setWidth] = useState<number>(32);
 	const [maskExprToWidth, setMaskExprToWidth] = useState<boolean>(false);
 	const [signedView, setSignedView] = useState<boolean>(false);
-	const [input, setInput] = useState<string>('0x4001_0020');
-	const [labelSpec, setLabelSpec] = useState<string>('31-24:RESERVED,23:ERR,22-16:MODE,15:RDY,8:EN,7-0:VALUE');
+	const [input, setInput] = useState<string>('0x2612_2018');
+	const [labelSpec, setLabelSpec] = useState<string>(`31-24:RSV, 23:ERR, 22-16:MD, 15:RDY, 8:EN, 7-0:VAL`);
 
 	// Multiple calculator instances
 	const [calcs, setCalcs] = useState<Calc[]>([
@@ -1330,7 +1330,7 @@ export default function RegisterWorkbench() {
 									</div>
 								</div>
 								<textarea
-									className="mt-2 w-full h-24 rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+									className="mt-2 w-full h-18 rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
 									value={labelSpec}
 									onChange={e => setLabelSpec(e.target.value)}
 									placeholder="7:READY,5-3:MODE,0:EN"
@@ -1346,7 +1346,7 @@ export default function RegisterWorkbench() {
 											<button
 												key={bit}
 												onClick={() => setBit(bit, !isSet)}
-												className={`group rounded-xl border px-2 py-1 text-left text-xs shadow-soft transition ${isSet
+												className={`group rounded-xl border px-1.5 py-1.5 text-left text-xs shadow-soft transition ${isSet
 														? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800/70 dark:text-emerald-100'
 														: 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-950/60 dark:border-slate-800/80 dark:text-slate-200'
 													}`}
@@ -1371,59 +1371,64 @@ export default function RegisterWorkbench() {
 								<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
 									Bitfields
 								</div>
-								<div className="flex items-end gap-3 flex-wrap">
-									<div>
-										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-											Field hi (bit)
-										</label>
-										<input
-											type="number"
-											className="mt-1 w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
-											value={fieldHi}
-											onChange={e =>
-												setFieldHi(
-													Math.min(
-														Math.max(parseInt(e.target.value || '0', 10), 0),
-														width - 1,
-													),
-												)
-											}
-										/>
+								<div>
+									<div className="grid sm:grid-cols-2 gap-2">
+										<div>
+											<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+												Field hi (bit)
+											</label>
+											<input
+												type="number"
+												className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+												value={fieldHi}
+												onChange={e =>
+													setFieldHi(
+														Math.min(
+															Math.max(parseInt(e.target.value || '0', 10), 0),
+															width - 1,
+														),
+													)
+												}
+											/>
+										</div>
+										<div>
+											<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+												Field lo (bit)
+											</label>
+											<input
+												type="number"
+												className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+												value={fieldLo}
+												onChange={e =>
+													setFieldLo(
+														Math.min(
+															Math.max(parseInt(e.target.value || '0', 10), 0),
+															width - 1,
+														),
+													)
+												}
+											/>
+										</div>
 									</div>
-									<div>
-										<label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-											Field lo (bit)
-										</label>
-										<input
-											type="number"
-											className="mt-1 w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/70 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
-											value={fieldLo}
-											onChange={e =>
-												setFieldLo(
-													Math.min(
-														Math.max(parseInt(e.target.value || '0', 10), 0),
-														width - 1,
-													),
-												)
-											}
-										/>
-									</div>
-									<div className="text-sm text-slate-700 dark:text-slate-200">
-										len ={' '}
-										<span className="font-mono text-slate-900 dark:text-slate-100">
-											{fieldLen}
-										</span>
-									</div>
-									<div className="ml-auto text-sm text-slate-700 dark:text-slate-200">
-										current ={' '}
-										<span className="font-mono text-slate-900 dark:text-slate-100">
-											{parsed.ok ? '0x' + fieldValue.toString(16) : '—'}
-										</span>{' '}
-										(
-										<span className="font-mono text-slate-900 dark:text-slate-100">
-											{fieldValue.toString()}
-										</span>
-										)
+
+									<div className="flex items-start gap-3 mt-1">
+										<div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+											len ={' '}
+											<span className="font-mono text-slate-900 dark:text-slate-100">
+												{fieldLen}
+											</span>
+										</div>
+										<div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+											current ={' '}
+											<span className="font-mono text-slate-900 dark:text-slate-100">
+												{parsed.ok ? '0x' + fieldValue.toString(16) : '—'}
+											</span>{' '}
+											(
+											<span className="font-mono text-slate-900 dark:text-slate-100">
+												{fieldValue.toString()}
+											</span>
+											)
+										</div>
 									</div>
 								</div>
 								<div className="flex items-end gap-2 flex-wrap">
@@ -1507,9 +1512,12 @@ export default function RegisterWorkbench() {
 								<div className="grid grid-cols-2 gap-4 text-sm">
 									<div>
 										<div className="text-slate-600 dark:text-slate-400">
-											Little-endian bytes (LSB→MSB)
+											Little-endian bytes
 										</div>
-										<div className="mt-1 flex flex-wrap gap-1 font-mono text-xs">
+										<div className="text-slate-600 dark:text-slate-400 text-xs">
+											(LSB→MSB)
+										</div>
+										<div className="mt-2 flex flex-wrap gap-1 font-mono text-xs">
 											{leBytes.map((b, i) => (
 												<span
 													key={i}
@@ -1522,9 +1530,12 @@ export default function RegisterWorkbench() {
 									</div>
 									<div>
 										<div className="text-slate-600 dark:text-slate-400">
-											Big-endian bytes (MSB→LSB)
+											Big-endian bytes
 										</div>
-										<div className="mt-1 flex flex-wrap gap-1 font-mono text-xs">
+										<div className="text-slate-600 dark:text-slate-400 text-xs">
+											(MSB→LSB)
+										</div>
+										<div className="mt-2 flex flex-wrap gap-1 font-mono text-xs">
 											{beBytes.map((b, i) => (
 												<span
 													key={i}
