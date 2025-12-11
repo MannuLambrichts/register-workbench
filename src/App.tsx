@@ -800,9 +800,9 @@ export default function RegisterWorkbench() {
 						{/* Left column: main value + calculators + ASCII + floats */}
 						<section className="md:col-span-3 space-y-4">
 							{/* Main value */}
-							<div className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-slate-800/70 dark:bg-slate-900/70">
+							<div className="rounded-3xl border-4 border-brand-500/80 bg-white/90 p-4 shadow backdrop-blur-xs dark:border-brand-800/70 dark:bg-slate-900/70">
 								<div className="flex items-center justify-between gap-2">
-									<div className="font-mono text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+									<div className="font-mono text-xs uppercase tracking-[0.18em] text-brand-700 dark:text-brand-500">
 										Main Value
 									</div>
 								</div>
